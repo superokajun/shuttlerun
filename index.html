@@ -61,15 +61,7 @@ section.on{display:flex}
 .big.playing{background:#1b2029;color:#ff6b35;border:2px solid #2a3038}
 .big svg{width:34%;height:34%}
 
-.foot{width:100%;display:flex;flex-direction:column;align-items:center;gap:16px}
-.seek{
-  width:100%;-webkit-appearance:none;appearance:none;background:none;height:26px;cursor:pointer;
-}
-.seek::-webkit-slider-runnable-track{height:5px;border-radius:3px;background:#232932}
-.seek::-webkit-slider-thumb{
-  -webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#f2f4f7;
-  margin-top:-8.5px;box-shadow:0 1px 5px rgba(0,0,0,.5);
-}
+.foot{width:100%;display:flex;flex-direction:column;align-items:center;padding-bottom:6px}
 .sub{display:flex}
 .sub button{
   font-family:inherit;font-size:13px;color:#8b95a1;background:#151a21;border:0;
@@ -111,7 +103,6 @@ section.on{display:flex}
     </button>
 
     <div class="foot">
-      <input class="seek" id="seek" type="range" min="0" max="1000" value="0" step="1">
       <div class="sub">
         <button id="reset">最初から</button>
       </div>
@@ -231,16 +222,8 @@ audio.addEventListener('play',  paint);
 audio.addEventListener('pause', ()=>{ paint(); release(); });
 audio.addEventListener('ended', ()=>{ paint(); release(); });
 
-let seeking = false;
-$('seek').addEventListener('input', ()=>{ seeking = true; });
-$('seek').addEventListener('change', ()=>{
-  if(isFinite(audio.duration)) audio.currentTime = audio.duration * ($('seek').value/1000);
-  seeking = false;
-});
 function tick(){
-  const d = audio.duration;
   $('elapsed').textContent = fmt(audio.currentTime);
-  if(!seeking && isFinite(d) && d > 0) $('seek').value = Math.round(audio.currentTime / d * 1000);
 }
 audio.addEventListener('timeupdate', tick);
 audio.addEventListener('loadedmetadata', tick);
