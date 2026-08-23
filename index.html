@@ -23,8 +23,7 @@ body{
   height:100%;display:flex;flex-direction:column;
   padding:calc(env(safe-area-inset-top) + 14px) 20px calc(env(safe-area-inset-bottom) + 18px);
 }
-.hd{display:flex;align-items:center;justify-content:space-between;flex:0 0 auto;height:26px}
-.hd .ttl{font-size:13px;letter-spacing:.14em;color:#5c6672;font-weight:600}
+.hd{display:flex;align-items:center;justify-content:flex-end;flex:0 0 auto;height:26px}
 .hd .gear{
   font-size:12px;color:#5c6672;background:none;border:0;padding:6px 2px 6px 10px;
   font-family:inherit;cursor:pointer;
@@ -47,12 +46,11 @@ section.on{display:flex}
 
 /* ---------- player ---------- */
 #player{align-items:center;justify-content:space-between;padding-top:8px}
-.clock{text-align:center;padding-top:14px}
+.clock{text-align:center;padding-top:34px}
 .elapsed{
   font-size:64px;font-weight:250;line-height:1;letter-spacing:-.02em;
   font-variant-numeric:tabular-nums;font-feature-settings:"tnum";
 }
-.remain{font-size:14px;color:#5c6672;margin-top:12px;font-variant-numeric:tabular-nums}
 
 .big{
   width:min(62vw,250px);aspect-ratio:1;border-radius:50%;border:0;cursor:pointer;
@@ -72,13 +70,12 @@ section.on{display:flex}
   -webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#f2f4f7;
   margin-top:-8.5px;box-shadow:0 1px 5px rgba(0,0,0,.5);
 }
-.sub{display:flex;gap:12px}
+.sub{display:flex}
 .sub button{
   font-family:inherit;font-size:13px;color:#8b95a1;background:#151a21;border:0;
   border-radius:999px;padding:11px 20px;cursor:pointer;
 }
 .sub button:active{background:#1b2029}
-.warn{font-size:11.5px;color:#4d5560;text-align:center;line-height:1.6}
 
 /* ---------- toast ---------- */
 #toast{
@@ -93,7 +90,6 @@ section.on{display:flex}
 <body>
 <div id="app">
   <div class="hd">
-    <span class="ttl">20m SHUTTLE RUN</span>
     <button class="gear" id="change" hidden>音源を変更</button>
   </div>
 
@@ -108,7 +104,6 @@ section.on{display:flex}
   <section id="player">
     <div class="clock">
       <div class="elapsed" id="elapsed">0:00</div>
-      <div class="remain" id="remain">残り --:--</div>
     </div>
 
     <button class="big" id="play" aria-label="再生">
@@ -118,10 +113,8 @@ section.on{display:flex}
     <div class="foot">
       <input class="seek" id="seek" type="range" min="0" max="1000" value="0" step="1">
       <div class="sub">
-        <button id="back10">10秒戻る</button>
         <button id="reset">最初から</button>
       </div>
-      <div class="warn">本体側面の消音スイッチがONだと音が出ないことがあります</div>
     </div>
   </section>
 </div>
@@ -232,7 +225,6 @@ $('play').onclick = async () => {
     else audio.pause();
   }catch(err){ toast('再生できませんでした'); }
 };
-$('back10').onclick = () => { audio.currentTime = Math.max(0, audio.currentTime - 10); };
 $('reset').onclick  = () => { audio.currentTime = 0; };
 
 audio.addEventListener('play',  paint);
@@ -248,7 +240,6 @@ $('seek').addEventListener('change', ()=>{
 function tick(){
   const d = audio.duration;
   $('elapsed').textContent = fmt(audio.currentTime);
-  $('remain').textContent  = isFinite(d) ? '残り ' + fmt(d - audio.currentTime) : '残り --:--';
   if(!seeking && isFinite(d) && d > 0) $('seek').value = Math.round(audio.currentTime / d * 1000);
 }
 audio.addEventListener('timeupdate', tick);
