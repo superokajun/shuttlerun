@@ -29,7 +29,9 @@ body{
   font-size:104px;font-weight:250;line-height:1;letter-spacing:-.03em;
   font-variant-numeric:tabular-nums;font-feature-settings:"tnum";
 }
-.meta{font-size:14px;color:#5c6672;margin-top:16px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.unit{font-size:36px;font-weight:300;color:#8b95a1;margin-left:8px;letter-spacing:0}
+.meta{font-size:19px;color:#8b95a1;margin-top:20px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.dist{font-size:31px;color:#f2f4f7;font-weight:300;margin-top:12px;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 
 .big{
   position:relative;margin:auto 0;
@@ -60,8 +62,9 @@ body{
 <body>
 <div id="app">
   <div class="head">
-    <div class="laps" id="laps">0</div>
-    <div class="meta" id="meta">80m · 全30本</div>
+    <div class="laps"><span id="laps">0</span><span class="unit">本</span></div>
+    <div class="meta" id="meta">レベル1 · 8.0km/h</div>
+    <div class="dist" id="dist">0m</div>
   </div>
 
   <button class="big" id="play" aria-label="開始">
@@ -108,6 +111,7 @@ function buildEvents(){
     t += dur;
     ev.push({t, say: ja(lap), lap, level});
   }
+  ev.forEach((e, i) => e.dist = i * (DISTANCE / 4));   // カウント1つで20m進む
   return ev;
 }
 const EVENTS = buildEvents();
@@ -132,10 +136,6 @@ function speak(text){
 }
 
 /* ==================== 表示 ==================== */
-function fmt(s){
-  s = Math.max(0, Math.floor(s));
-  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
-}
 let toastTimer;
 function toast(msg, ms){
   const t = $('toast');
@@ -156,15 +156,20 @@ function paint(){
   $('play').setAttribute('aria-label', running ? '長押しで停止' : '開始');
 }
 
+function show(lap, level, dist){
+  $('laps').textContent = lap;
+  $('meta').textContent = 'レベル' + level + ' · ' + speedOf(level).toFixed(1) + 'km/h';
+  $('dist').textContent = dist + 'm';
+}
+
 function step(){
   const now = (performance.now() - t0) / 1000;
   while(idx < EVENTS.length && EVENTS[idx].t <= now){
     const e = EVENTS[idx++];
     speak(e.say);
     lastLap = e.lap; curLevel = e.level;
-    $('laps').textContent = e.lap;
+    show(e.lap, e.level, e.dist);
   }
-  $('meta').textContent = 'レベル' + curLevel + ' · ' + fmt(now);
   if(idx >= EVENTS.length) finish();
 }
 
@@ -172,6 +177,7 @@ function begin(){
   t0 = performance.now();
   idx = 0; lastLap = 0; curLevel = 1;
   running = true;
+  show(0, 1, 0);
   paint(); wake();
   step();                                   // 最初の「ゼロ」はタップ直後に発話する
   loop = setInterval(step, 40);
@@ -182,15 +188,11 @@ function halt(){
   speechSynthesis.cancel();
   paint(); release();
 }
-function stop(){                            // 長押しによる中止
-  const t = (performance.now() - t0) / 1000;
+function stop(){    // 長押しによる中止。本数・距離は画面に残したままにする
   halt();
-  $('meta').textContent = '記録 ' + lastLap + '本 · ' + fmt(t);
 }
-function finish(){                          // 全本数を走りきった
-  const t = (performance.now() - t0) / 1000;
+function finish(){ // 全本数を走りきった
   halt();
-  $('meta').textContent = '完走 ' + TOTAL_LAPS + '本 · ' + fmt(t);
 }
 
 /* ==================== 停止は2秒長押し ==================== */
