@@ -20,37 +20,16 @@ body{
   -webkit-user-select:none;user-select:none;overscroll-behavior:none;
 }
 #app{
-  height:100%;display:flex;flex-direction:column;
-  padding:calc(env(safe-area-inset-top) + 14px) 20px calc(env(safe-area-inset-bottom) + 18px);
+  height:100%;display:flex;flex-direction:column;align-items:center;
+  padding:calc(env(safe-area-inset-top) + 46px) 20px calc(env(safe-area-inset-bottom) + 18px);
 }
-.hd{display:flex;align-items:center;justify-content:flex-end;flex:0 0 auto;height:26px}
-.hd .gear{
-  font-size:12px;color:#5c6672;background:none;border:0;padding:6px 2px 6px 10px;
-  font-family:inherit;cursor:pointer;
-}
-section{flex:1 1 auto;display:none;flex-direction:column}
-section.on{display:flex}
 
-/* ---------- setup ---------- */
-#setup{align-items:center;justify-content:center;text-align:center;gap:0}
-#setup .mark{font-size:46px;line-height:1;margin-bottom:26px}
-#setup h1{font-size:21px;font-weight:700;margin-bottom:14px;letter-spacing:.02em}
-#setup p{font-size:14px;line-height:1.85;color:#8b95a1;margin-bottom:34px;max-width:19em}
-.btn{
-  font-family:inherit;font-size:16px;font-weight:700;color:#0b0d10;background:#ff6b35;
-  border:0;border-radius:999px;padding:17px 40px;cursor:pointer;letter-spacing:.02em;
-}
-.btn:active{transform:scale(.97)}
-.btn.ghost{background:none;color:#8b95a1;border:1.5px solid #2a3038;padding:14px 30px;font-size:14px}
-#setup .note{font-size:12px;color:#5c6672;margin-top:26px;line-height:1.7}
-
-/* ---------- player ---------- */
-#player{align-items:center;justify-content:flex-start;padding-top:8px}
-.clock{text-align:center;padding-top:34px}
-.elapsed{
-  font-size:64px;font-weight:250;line-height:1;letter-spacing:-.02em;
+.head{text-align:center}
+.laps{
+  font-size:104px;font-weight:250;line-height:1;letter-spacing:-.03em;
   font-variant-numeric:tabular-nums;font-feature-settings:"tnum";
 }
+.meta{font-size:14px;color:#5c6672;margin-top:16px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
 
 .big{
   position:relative;margin:auto 0;
@@ -69,7 +48,6 @@ section.on{display:flex}
 .big.holding .ring{opacity:1}
 .ring circle{fill:none;stroke:#ff6b35;stroke-width:4}
 
-/* ---------- toast ---------- */
 #toast{
   position:fixed;left:50%;transform:translateX(-50%);
   bottom:calc(env(safe-area-inset-bottom) + 30px);
@@ -81,169 +59,168 @@ section.on{display:flex}
 </head>
 <body>
 <div id="app">
-  <div class="hd">
-    <button class="gear" id="change" hidden>音源を変更</button>
+  <div class="head">
+    <div class="laps" id="laps">0</div>
+    <div class="meta" id="meta">80m · 全30本</div>
   </div>
 
-  <section id="setup">
-    <div class="mark">🎧</div>
-    <h1>音源を読み込む</h1>
-    <p>初回だけの設定です。iPhoneに保存したシャトルランの音源ファイルを選んでください。</p>
-    <button class="btn" id="pick">音源ファイルを選ぶ</button>
-    <div class="note">選んだ音源はこのiPhoneの中に保存されます。<br>次回からはこの画面は出ません。</div>
-  </section>
-
-  <section id="player">
-    <div class="clock">
-      <div class="elapsed" id="elapsed">0:00</div>
-    </div>
-
-    <button class="big" id="play" aria-label="再生">
-      <svg class="ring" viewBox="0 0 100 100"><circle id="prog" cx="50" cy="50" r="48"/></svg>
-      <svg id="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.54.84l10-6.5a1 1 0 0 0 0-1.68l-10-6.5A1 1 0 0 0 8 5.5z"/></svg>
-    </button>
-  </section>
+  <button class="big" id="play" aria-label="開始">
+    <svg class="ring" viewBox="0 0 100 100"><circle id="prog" cx="50" cy="50" r="48"/></svg>
+    <svg id="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.54.84l10-6.5a1 1 0 0 0 0-1.68l-10-6.5A1 1 0 0 0 8 5.5z"/></svg>
+  </button>
 </div>
 
-<input type="file" id="file" accept="audio/*,.mp3,.m4a,.wav" hidden>
-<audio id="audio" preload="auto"></audio>
 <div id="toast"></div>
 
 <script>
-const $ = s => document.getElementById(s);
-const audio = $('audio');
-const DB='shuttlerun', STORE='files', KEY='audio';
+const $ = id => document.getElementById(id);
 
-/* ---------- IndexedDB ---------- */
-function db(){
-  return new Promise((res,rej)=>{
-    const r = indexedDB.open(DB,1);
-    r.onupgradeneeded = () => r.result.createObjectStore(STORE);
-    r.onsuccess = () => res(r.result);
-    r.onerror   = () => rej(r.error);
-  });
-}
-async function put(blob){
-  const d = await db();
-  return new Promise((res,rej)=>{
-    const tx = d.transaction(STORE,'readwrite');
-    tx.objectStore(STORE).put(blob,KEY);
-    tx.oncomplete = res;
-    tx.onerror    = () => rej(tx.error);
-  });
-}
-async function get(){
-  const d = await db();
-  return new Promise((res,rej)=>{
-    const tx = d.transaction(STORE,'readonly');
-    const q  = tx.objectStore(STORE).get(KEY);
-    q.onsuccess = () => res(q.result || null);
-    q.onerror   = () => rej(q.error);
-  });
+/* ==================== ペース設計 ====================
+   ・距離は80m。速度は20mシャトルランの規定に準拠
+   ・2本ごとに1レベル上がる（80m2本=160m ≒ 20m8回ぶんの負荷）
+   ・1本を4分割してカウント。先頭のカウントが「完走した本数」になる
+     0,2,3,4 → 1,2,3,4 → 2,2,3,4 …
+==================================================== */
+const TOTAL_LAPS     = 30;
+const LAPS_PER_LEVEL = 2;
+const DISTANCE       = 80;
+
+const speedOf = lv => lv === 1 ? 8.0 : 9.0 + 0.5 * (lv - 2);   // km/h
+const lapSec  = lv => DISTANCE * 3.6 / speedOf(lv);            // 80mの制限時間(秒)
+
+const ONES = ['ゼロ','いち','に','さん','よん','ご','ろく','なな','はち','きゅう'];
+function ja(n){
+  if(n < 10)  return ONES[n];
+  if(n < 20)  return 'じゅう' + (n % 10 ? ONES[n % 10] : '');
+  return ONES[Math.floor(n / 10)] + 'じゅう' + (n % 10 ? ONES[n % 10] : '');
 }
 
-/* ---------- helpers ---------- */
+function buildEvents(){
+  const ev = [];
+  let t = 0;
+  ev.push({t: 0, say: 'ゼロ', lap: 0, level: 1});
+  for(let lap = 1; lap <= TOTAL_LAPS; lap++){
+    const level = Math.ceil(lap / LAPS_PER_LEVEL);
+    const dur = lapSec(level), q = dur / 4;
+    ev.push({t: t + q,     say: 'に',   lap: lap - 1, level});
+    ev.push({t: t + q * 2, say: 'さん', lap: lap - 1, level});
+    ev.push({t: t + q * 3, say: 'よん', lap: lap - 1, level});
+    t += dur;
+    ev.push({t, say: ja(lap), lap, level});
+  }
+  return ev;
+}
+const EVENTS = buildEvents();
+
+/* ==================== 読み上げ ==================== */
+let voice = null;
+function pickVoice(){
+  const vs = speechSynthesis.getVoices();
+  voice = vs.find(v => v.lang === 'ja-JP') || vs.find(v => v.lang && v.lang.startsWith('ja')) || null;
+}
+pickVoice();
+if('onvoiceschanged' in speechSynthesis) speechSynthesis.onvoiceschanged = pickVoice;
+
+function speak(text){
+  try{
+    speechSynthesis.cancel();                       // 前の発話が残っていたら打ち切る
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ja-JP'; u.rate = 1.1; u.volume = 1;
+    if(voice) u.voice = voice;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+/* ==================== 表示 ==================== */
 function fmt(s){
-  if(!isFinite(s) || s < 0) s = 0;
-  s = Math.floor(s);
-  return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+  s = Math.max(0, Math.floor(s));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
 let toastTimer;
 function toast(msg, ms){
   const t = $('toast');
   t.textContent = msg; t.classList.add('on');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.remove('on'), ms || 2600);
-}
-function show(which){
-  $('setup').classList.toggle('on', which === 'setup');
-  $('player').classList.toggle('on', which === 'player');
-  $('change').hidden = which !== 'player';
+  toastTimer = setTimeout(() => t.classList.remove('on'), ms || 2600);
 }
 
-/* ---------- load ---------- */
-let objectUrl = null;
-function attach(blob){
-  if(objectUrl) URL.revokeObjectURL(objectUrl);
-  objectUrl = URL.createObjectURL(blob);
-  audio.src = objectUrl;
-  audio.load();
-}
-(async function init(){
-  try{
-    const blob = await get();
-    if(blob){ attach(blob); show('player'); }
-    else show('setup');
-  }catch(e){ show('setup'); }
-  if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
-})();
-
-/* ---------- file pick ---------- */
-$('pick').onclick   = () => $('file').click();
-$('change').onclick = () => $('file').click();
-$('file').onchange = async e => {
-  const f = e.target.files[0];
-  if(!f) return;
-  toast('保存しています…');
-  try{
-    await put(f);
-    attach(f);
-    show('player');
-    toast('準備できました');
-  }catch(err){
-    toast('保存できませんでした：' + (err && err.name || 'エラー'));
-  }
-  e.target.value = '';
-};
-
-/* ---------- playback ---------- */
+/* ==================== 進行 ==================== */
 const PLAY = 'M8 5.5v13a1 1 0 0 0 1.54.84l10-6.5a1 1 0 0 0 0-1.68l-10-6.5A1 1 0 0 0 8 5.5z';
 const STOP = 'M6.5 8a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-8a1.5 1.5 0 0 1-1.5-1.5z';
+
+let running = false, t0 = 0, idx = 0, loop = null, lastLap = 0, curLevel = 1;
+
 function paint(){
-  const playing = !audio.paused;
-  $('ico').firstElementChild.setAttribute('d', playing ? STOP : PLAY);
-  $('play').classList.toggle('playing', playing);
-  $('play').setAttribute('aria-label', playing ? '長押しで停止' : '再生');
+  $('ico').firstElementChild.setAttribute('d', running ? STOP : PLAY);
+  $('play').classList.toggle('playing', running);
+  $('play').setAttribute('aria-label', running ? '長押しで停止' : '開始');
 }
 
-/* 停止は2秒の長押しでのみ発動する（走行中の誤タップ対策） */
+function step(){
+  const now = (performance.now() - t0) / 1000;
+  while(idx < EVENTS.length && EVENTS[idx].t <= now){
+    const e = EVENTS[idx++];
+    speak(e.say);
+    lastLap = e.lap; curLevel = e.level;
+    $('laps').textContent = e.lap;
+  }
+  $('meta').textContent = 'レベル' + curLevel + ' · ' + fmt(now);
+  if(idx >= EVENTS.length) finish();
+}
+
+function begin(){
+  t0 = performance.now();
+  idx = 0; lastLap = 0; curLevel = 1;
+  running = true;
+  paint(); wake();
+  step();                                   // 最初の「ゼロ」はタップ直後に発話する
+  loop = setInterval(step, 40);
+}
+function halt(){
+  if(loop){ clearInterval(loop); loop = null; }
+  running = false;
+  speechSynthesis.cancel();
+  paint(); release();
+}
+function stop(){                            // 長押しによる中止
+  const t = (performance.now() - t0) / 1000;
+  halt();
+  $('meta').textContent = '記録 ' + lastLap + '本 · ' + fmt(t);
+}
+function finish(){                          // 全本数を走りきった
+  const t = (performance.now() - t0) / 1000;
+  halt();
+  $('meta').textContent = '完走 ' + TOTAL_LAPS + '本 · ' + fmt(t);
+}
+
+/* ==================== 停止は2秒長押し ==================== */
 const HOLD = 2000;
-const btn  = $('play');
-const prog = $('prog');
-const C    = 2 * Math.PI * 48;
+const btn = $('play'), prog = $('prog');
+const C = 2 * Math.PI * 48;
 prog.style.strokeDasharray = C;
 prog.style.strokeDashoffset = C;
 
-let raf = null, timer = null, t0 = 0, skipClick = false;
+let raf = null, timer = null, hold0 = 0, skipClick = false;
 
 function holdStart(){
-  if(audio.paused || timer) return;
-  t0 = performance.now();
+  if(!running || timer) return;
+  hold0 = performance.now();
   btn.classList.add('holding');
-  timer = setTimeout(() => { timer = null; stop(); }, HOLD);   // 停止の判定はこちら
-  const step = () => {                                        // リングは見た目のみ
-    const p = Math.min(1, (performance.now() - t0) / HOLD);
+  timer = setTimeout(() => { timer = null; skipClick = true; stop(); }, HOLD);
+  const draw = () => {
+    const p = Math.min(1, (performance.now() - hold0) / HOLD);
     prog.style.strokeDashoffset = C * (1 - p);
-    raf = p < 1 ? requestAnimationFrame(step) : null;
+    raf = p < 1 ? requestAnimationFrame(draw) : null;
   };
-  raf = requestAnimationFrame(step);
+  raf = requestAnimationFrame(draw);
 }
 function holdEnd(){
-  const held = timer ? performance.now() - t0 : 0;
+  const held = timer ? performance.now() - hold0 : 0;
   if(timer){ clearTimeout(timer); timer = null; }
   if(raf){ cancelAnimationFrame(raf); raf = null; }
   btn.classList.remove('holding');
   prog.style.strokeDashoffset = C;
-  if(held > 0 && held < 600 && !audio.paused) toast('長押しで停止', 1400);
-}
-function stop(){
-  if(timer){ clearTimeout(timer); timer = null; }
-  if(raf){ cancelAnimationFrame(raf); raf = null; }
-  btn.classList.remove('holding');
-  prog.style.strokeDashoffset = C;
-  skipClick = true;          // 停止直後のclickで再生し直さないため
-  audio.pause();
-  audio.currentTime = 0;
+  if(held > 0 && held < 600 && running) toast('長押しで停止', 1400);
 }
 
 btn.addEventListener('pointerdown', holdStart);
@@ -251,42 +228,24 @@ btn.addEventListener('pointerup', holdEnd);
 btn.addEventListener('pointercancel', holdEnd);
 btn.addEventListener('pointerleave', holdEnd);
 btn.addEventListener('contextmenu', e => e.preventDefault());
-btn.addEventListener('click', async () => {
+btn.addEventListener('click', () => {
   if(skipClick){ skipClick = false; return; }
-  if(!audio.paused) return;
-  try{ await audio.play(); wake(); }catch(err){ toast('再生できませんでした'); }
+  if(!running) begin();
 });
 
-audio.addEventListener('play',  paint);
-audio.addEventListener('pause', ()=>{ paint(); release(); });
-audio.addEventListener('ended', ()=>{ paint(); release(); });
-
-function tick(){
-  $('elapsed').textContent = fmt(audio.currentTime);
-}
-audio.addEventListener('timeupdate', tick);
-audio.addEventListener('loadedmetadata', tick);
-
-/* ---------- lock screen controls ---------- */
-if('mediaSession' in navigator){
-  navigator.mediaSession.metadata = new MediaMetadata({ title:'20mシャトルラン', artist:'' });
-  navigator.mediaSession.setActionHandler('play',  ()=>audio.play());
-  navigator.mediaSession.setActionHandler('pause', ()=>stop());
-}
-
-/* ---------- keep screen awake ---------- */
+/* ==================== 画面を消さない ==================== */
 let lock = null;
 async function wake(){
   try{ if('wakeLock' in navigator && !lock) lock = await navigator.wakeLock.request('screen'); }catch(e){}
 }
 function release(){ try{ if(lock){ lock.release(); lock = null; } }catch(e){} }
-document.addEventListener('visibilitychange', ()=>{
-  if(document.visibilityState === 'visible' && !audio.paused) wake();
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && running) wake();
 });
 
-/* ---------- offline ---------- */
+/* ==================== オフライン ==================== */
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 </script>
 </body>
