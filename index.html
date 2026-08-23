@@ -45,7 +45,7 @@ section.on{display:flex}
 #setup .note{font-size:12px;color:#5c6672;margin-top:26px;line-height:1.7}
 
 /* ---------- player ---------- */
-#player{align-items:center;justify-content:space-between;padding-top:8px}
+#player{align-items:center;justify-content:flex-start;padding-top:8px}
 .clock{text-align:center;padding-top:34px}
 .elapsed{
   font-size:64px;font-weight:250;line-height:1;letter-spacing:-.02em;
@@ -53,22 +53,21 @@ section.on{display:flex}
 }
 
 .big{
-  width:min(62vw,250px);aspect-ratio:1;border-radius:50%;border:0;cursor:pointer;
+  position:relative;margin:auto 0;
+  width:min(54vw,215px);aspect-ratio:1;border-radius:50%;border:0;cursor:pointer;
   background:#ff6b35;color:#0b0d10;display:flex;align-items:center;justify-content:center;
   transition:background .15s;flex:0 0 auto;
+  touch-action:manipulation;-webkit-touch-callout:none;
 }
 .big:active{transform:scale(.97)}
-.big.playing{background:#1b2029;color:#ff6b35;border:2px solid #2a3038}
-.big svg{width:34%;height:34%}
+.big.playing{background:#1b2029;color:#ff6b35}
+.big.holding{background:#212832}
+.big #ico{width:34%;height:34%}
 
-.foot{width:100%;display:flex;flex-direction:column;align-items:center;padding-bottom:6px}
-.sub{display:flex}
-.sub button{
-  width:58px;height:58px;border-radius:50%;background:#171c24;border:0;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;color:#8b95a1;
-}
-.sub button:active{background:#212832;transform:scale(.95)}
-.sub button svg{width:25px;height:25px}
+/* 長押しの進捗リング */
+.ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);pointer-events:none;opacity:0}
+.big.holding .ring{opacity:1}
+.ring circle{fill:none;stroke:#ff6b35;stroke-width:4}
 
 /* ---------- toast ---------- */
 #toast{
@@ -100,19 +99,9 @@ section.on{display:flex}
     </div>
 
     <button class="big" id="play" aria-label="再生">
+      <svg class="ring" viewBox="0 0 100 100"><circle id="prog" cx="50" cy="50" r="48"/></svg>
       <svg id="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.54.84l10-6.5a1 1 0 0 0 0-1.68l-10-6.5A1 1 0 0 0 8 5.5z"/></svg>
     </button>
-
-    <div class="foot">
-      <div class="sub">
-        <button id="reset" aria-label="最初から">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="1 4 1 10 7 10"/>
-            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-          </svg>
-        </button>
-      </div>
-    </div>
   </section>
 </div>
 
@@ -160,11 +149,11 @@ function fmt(s){
   return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
 }
 let toastTimer;
-function toast(msg){
+function toast(msg, ms){
   const t = $('toast');
   t.textContent = msg; t.classList.add('on');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>t.classList.remove('on'), 2600);
+  toastTimer = setTimeout(()=>t.classList.remove('on'), ms || 2600);
 }
 function show(which){
   $('setup').classList.toggle('on', which === 'setup');
@@ -208,21 +197,65 @@ $('file').onchange = async e => {
 };
 
 /* ---------- playback ---------- */
-const PLAY  = 'M8 5.5v13a1 1 0 0 0 1.54.84l10-6.5a1 1 0 0 0 0-1.68l-10-6.5A1 1 0 0 0 8 5.5z';
-const PAUSE = 'M7 4h3.2v16H7zm6.8 0H17v16h-3.2z';
+const PLAY = 'M8 5.5v13a1 1 0 0 0 1.54.84l10-6.5a1 1 0 0 0 0-1.68l-10-6.5A1 1 0 0 0 8 5.5z';
+const STOP = 'M6.5 8a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-8a1.5 1.5 0 0 1-1.5-1.5z';
 function paint(){
   const playing = !audio.paused;
-  $('ico').firstElementChild.setAttribute('d', playing ? PAUSE : PLAY);
+  $('ico').firstElementChild.setAttribute('d', playing ? STOP : PLAY);
   $('play').classList.toggle('playing', playing);
-  $('play').setAttribute('aria-label', playing ? '一時停止' : '再生');
+  $('play').setAttribute('aria-label', playing ? '長押しで停止' : '再生');
 }
-$('play').onclick = async () => {
-  try{
-    if(audio.paused){ await audio.play(); wake(); }
-    else audio.pause();
-  }catch(err){ toast('再生できませんでした'); }
-};
-$('reset').onclick  = () => { audio.currentTime = 0; };
+
+/* 停止は2秒の長押しでのみ発動する（走行中の誤タップ対策） */
+const HOLD = 2000;
+const btn  = $('play');
+const prog = $('prog');
+const C    = 2 * Math.PI * 48;
+prog.style.strokeDasharray = C;
+prog.style.strokeDashoffset = C;
+
+let raf = null, timer = null, t0 = 0, skipClick = false;
+
+function holdStart(){
+  if(audio.paused || timer) return;
+  t0 = performance.now();
+  btn.classList.add('holding');
+  timer = setTimeout(() => { timer = null; stop(); }, HOLD);   // 停止の判定はこちら
+  const step = () => {                                        // リングは見た目のみ
+    const p = Math.min(1, (performance.now() - t0) / HOLD);
+    prog.style.strokeDashoffset = C * (1 - p);
+    raf = p < 1 ? requestAnimationFrame(step) : null;
+  };
+  raf = requestAnimationFrame(step);
+}
+function holdEnd(){
+  const held = timer ? performance.now() - t0 : 0;
+  if(timer){ clearTimeout(timer); timer = null; }
+  if(raf){ cancelAnimationFrame(raf); raf = null; }
+  btn.classList.remove('holding');
+  prog.style.strokeDashoffset = C;
+  if(held > 0 && held < 600 && !audio.paused) toast('長押しで停止', 1400);
+}
+function stop(){
+  if(timer){ clearTimeout(timer); timer = null; }
+  if(raf){ cancelAnimationFrame(raf); raf = null; }
+  btn.classList.remove('holding');
+  prog.style.strokeDashoffset = C;
+  skipClick = true;          // 停止直後のclickで再生し直さないため
+  audio.pause();
+  audio.currentTime = 0;
+}
+
+btn.addEventListener('pointerdown', holdStart);
+btn.addEventListener('pointerup', holdEnd);
+btn.addEventListener('pointercancel', holdEnd);
+btn.addEventListener('pointerleave', holdEnd);
+btn.addEventListener('contextmenu', e => e.preventDefault());
+btn.addEventListener('click', async () => {
+  if(skipClick){ skipClick = false; return; }
+  if(!audio.paused) return;
+  try{ await audio.play(); wake(); }catch(err){ toast('再生できませんでした'); }
+});
 
 audio.addEventListener('play',  paint);
 audio.addEventListener('pause', ()=>{ paint(); release(); });
@@ -238,7 +271,7 @@ audio.addEventListener('loadedmetadata', tick);
 if('mediaSession' in navigator){
   navigator.mediaSession.metadata = new MediaMetadata({ title:'20mシャトルラン', artist:'' });
   navigator.mediaSession.setActionHandler('play',  ()=>audio.play());
-  navigator.mediaSession.setActionHandler('pause', ()=>audio.pause());
+  navigator.mediaSession.setActionHandler('pause', ()=>stop());
 }
 
 /* ---------- keep screen awake ---------- */
