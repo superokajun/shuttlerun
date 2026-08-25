@@ -80,17 +80,17 @@ body{
 const $ = id => document.getElementById(id);
 
 /* ==================== ペース設計 ====================
-   ・距離は80m。速度は20mシャトルランの規定に準拠
-   ・2本ごとに1レベル上がる（80m2本=160m ≒ 20m8回ぶんの負荷）
-   ・1本を4分割してカウント。先頭のカウントが「完走した本数」になる
+   20mシャトルランそのものを走る。違いは折り返しが80mごとになることだけ。
+   ・カウントは20mごと。間隔もレベルの切り替わりも20m版の規定どおり
+   ・4カウント＝80m＝1本。先頭のカウントが「完走した本数」になる
      0,2,3,4 → 1,2,3,4 → 2,2,3,4 …
+   ・したがって速度の推移は20mシャトルランと完全に一致する
 ==================================================== */
-const TOTAL_LAPS     = 30;
-const LAPS_PER_LEVEL = 2;
-const DISTANCE       = 80;
+const REPS = [7,8,8,9,9,10,10,11,11,11,12,12,12,13,13,14,14,15,15,16,16]; // 各レベルの折り返し回数
+const SEG  = 20;   // カウント1つぶんの距離(m)
 
 const speedOf = lv => lv === 1 ? 8.0 : 9.0 + 0.5 * (lv - 2);   // km/h
-const lapSec  = lv => DISTANCE * 3.6 / speedOf(lv);            // 80mの制限時間(秒)
+const gapSec  = lv => SEG * 3.6 / speedOf(lv);                 // カウントの間隔(秒)
 
 const ONES = ['ゼロ','いち','に','さん','よん','ご','ろく','なな','はち','きゅう'];
 function ja(n){
@@ -101,18 +101,20 @@ function ja(n){
 
 function buildEvents(){
   const ev = [];
-  let t = 0;
-  ev.push({t: 0, say: 'ゼロ', lap: 0, level: 1});
-  for(let lap = 1; lap <= TOTAL_LAPS; lap++){
-    const level = Math.ceil(lap / LAPS_PER_LEVEL);
-    const dur = lapSec(level), q = dur / 4;
-    ev.push({t: t + q,     say: 'に',   lap: lap - 1, level});
-    ev.push({t: t + q * 2, say: 'さん', lap: lap - 1, level});
-    ev.push({t: t + q * 3, say: 'よん', lap: lap - 1, level});
-    t += dur;
-    ev.push({t, say: ja(lap), lap, level});
+  let t = 0, n = 0;                                   // n = 累計カウント数（20m版の折り返し回数と同じ）
+  ev.push({t: 0, say: 'ゼロ', lap: 0, level: 1, dist: 0});
+  for(let lv = 1; lv <= REPS.length; lv++){
+    const gap = gapSec(lv);
+    for(let i = 0; i < REPS[lv - 1]; i++){
+      t += gap; n++;
+      const lap = Math.floor(n / 4);                  // 完走した本数
+      ev.push({
+        t, level: lv, lap, dist: n * SEG,
+        say: n % 4 === 0 ? ja(lap) : ONES[(n % 4) + 1]
+      });
+    }
   }
-  ev.forEach((e, i) => e.dist = i * (DISTANCE / 4));   // カウント1つで20m進む
+  while(ev.length > 1 && (ev.length - 1) % 4 !== 0) ev.pop();   // 本数の区切りで終わらせる
   return ev;
 }
 const EVENTS = buildEvents();
