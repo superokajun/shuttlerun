@@ -1,5 +1,6 @@
-const CACHE  = 'shuttlerun-v3';
-const ASSETS = ['./','./index.html','./manifest.webmanifest','./icon-180.png','./icon-192.png','./icon-512.png'];
+const CACHE  = 'shuttlerun-v4';
+const VOICE  = ['0','1','2','3','4','5','6','7','8','9','10','20','30','40','50','60'].map(n => './voice/' + n + '.mp3');
+const ASSETS = ['./','./index.html','./manifest.webmanifest','./icon-180.png','./icon-192.png','./icon-512.png'].concat(VOICE);
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

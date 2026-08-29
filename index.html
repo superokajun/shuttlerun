@@ -92,17 +92,17 @@ const SEG  = 20;   // カウント1つぶんの距離(m)
 const speedOf = lv => lv === 1 ? 8.0 : 9.0 + 0.5 * (lv - 2);   // km/h
 const gapSec  = lv => SEG * 3.6 / speedOf(lv);                 // カウントの間隔(秒)
 
-const ONES = ['ゼロ','いち','に','さん','よん','ご','ろく','なな','はち','きゅう'];
-function ja(n){
-  if(n < 10)  return ONES[n];
-  if(n < 20)  return 'じゅう' + (n % 10 ? ONES[n % 10] : '');
-  return ONES[Math.floor(n / 10)] + 'じゅう' + (n % 10 ? ONES[n % 10] : '');
+function parts(n){                    // 数字を、録音してある部品の並びに分解する
+  if(n < 10) return [String(n)];
+  if(n < 20) return n === 10 ? ['10'] : ['10', String(n - 10)];
+  const t = Math.floor(n / 10) * 10, o = n % 10;
+  return o ? [String(t), String(o)] : [String(t)];
 }
 
 function buildEvents(){
   const ev = [];
   let t = 0, n = 0;                                   // n = 累計カウント数（20m版の折り返し回数と同じ）
-  ev.push({t: 0, say: 'ゼロ', lap: 0, level: 1, dist: 0});
+  ev.push({t: 0, say: 0, lap: 0, level: 1, dist: 0});
   for(let lv = 1; lv <= REPS.length; lv++){
     const gap = gapSec(lv);
     for(let i = 0; i < REPS[lv - 1]; i++){
@@ -110,7 +110,7 @@ function buildEvents(){
       const lap = Math.floor(n / 4);                  // 完走した本数
       ev.push({
         t, level: lv, lap, dist: n * SEG,
-        say: n % 4 === 0 ? ja(lap) : ONES[(n % 4) + 1]
+        say: n % 4 === 0 ? lap : (n % 4) + 1        // 区切りは本数、途中は 2・3・4
       });
     }
   }
@@ -119,23 +119,34 @@ function buildEvents(){
 }
 const EVENTS = buildEvents();
 
-/* ==================== 読み上げ ==================== */
-let voice = null;
-function pickVoice(){
-  const vs = speechSynthesis.getVoices();
-  voice = vs.find(v => v.lang === 'ja-JP') || vs.find(v => v.lang && v.lang.startsWith('ja')) || null;
-}
-pickVoice();
-if('onvoiceschanged' in speechSynthesis) speechSynthesis.onvoiceschanged = pickVoice;
+/* ==================== 読み上げ（録音した音声を鳴らす） ==================== */
+const FILES   = ['0','1','2','3','4','5','6','7','8','9','10','20','30','40','50','60'];
+const OVERLAP = 0.12;                 // 部品をつなぐとき、前の語の末尾をこれだけ削る
+const buffers = {};
+let ctx = null, ready = false;
 
-function speak(text){
-  try{
-    speechSynthesis.cancel();                       // 前の発話が残っていたら打ち切る
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ja-JP'; u.rate = 1.1; u.volume = 1;
-    if(voice) u.voice = voice;
-    speechSynthesis.speak(u);
-  }catch(e){}
+async function loadVoices(){
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  await Promise.all(FILES.map(async n => {
+    const res = await fetch('voice/' + n + '.mp3');
+    buffers[n] = await ctx.decodeAudioData(await res.arrayBuffer());
+  }));
+  ready = true;
+}
+loadVoices().catch(() => toast('音声を読み込めませんでした'));
+
+function speak(num){
+  if(!ctx) return;
+  let at = ctx.currentTime;
+  for(const p of parts(num)){
+    const buf = buffers[p];
+    if(!buf) continue;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(at);
+    at += Math.max(0.05, buf.duration - OVERLAP);
+  }
 }
 
 /* ==================== 表示 ==================== */
@@ -188,7 +199,6 @@ function begin(){
 function halt(){
   if(loop){ clearInterval(loop); loop = null; }
   running = false;
-  speechSynthesis.cancel();
   paint(); release();
 }
 function stop(){    // 長押しによる中止。本数・距離は画面に残したままにする
@@ -233,9 +243,12 @@ btn.addEventListener('pointerup', holdEnd);
 btn.addEventListener('pointercancel', holdEnd);
 btn.addEventListener('pointerleave', holdEnd);
 btn.addEventListener('contextmenu', e => e.preventDefault());
-btn.addEventListener('click', () => {
+btn.addEventListener('click', async () => {
   if(skipClick){ skipClick = false; return; }
-  if(!running) begin();
+  if(running) return;
+  if(!ready){ toast('音声を準備しています…', 1500); return; }
+  if(ctx.state === 'suspended') await ctx.resume();   // iOSはタップ内で起こす必要がある
+  begin();
 });
 
 /* ==================== 画面を消さない ==================== */
