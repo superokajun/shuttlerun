@@ -37,21 +37,49 @@ body{
 .val{letter-spacing:-.01em;text-align:center}
 
 .big{
-  position:relative;margin:auto 0;
+  margin:auto 0;
   width:min(33vw,131px);aspect-ratio:1;border-radius:50%;border:0;cursor:pointer;
   background:#ff6b35;color:#0b0d10;display:flex;align-items:center;justify-content:center;
-  transition:background .15s;flex:0 0 auto;
-  touch-action:manipulation;-webkit-touch-callout:none;
+  flex:0 0 auto;touch-action:manipulation;-webkit-touch-callout:none;
 }
 .big:active{transform:scale(.97)}
-.big.playing{background:#1b2029;color:#ff6b35}
-.big.holding{background:#212832}
+.big.hide{display:none}
 .big #ico{width:34%;height:34%}
 
-/* 長押しの進捗リング */
-.ring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);pointer-events:none;opacity:0}
-.big.holding .ring{opacity:1}
-.ring circle{fill:none;stroke:#ff6b35;stroke-width:4}
+/* 走行中はスライダー。つまみを右端まで引くと停止の確認が出る */
+.slide{
+  position:relative;margin:auto 0;flex:0 0 auto;
+  width:min(86vw,330px);height:72px;border-radius:999px;background:#1b2029;
+  display:none;align-items:center;overflow:hidden;
+  touch-action:none;-webkit-touch-callout:none;
+}
+.slide.on{display:flex}
+.slide .hint{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  padding-left:60px;font-size:18px;color:#fff;letter-spacing:.1em;pointer-events:none;
+}
+.slide .knob{
+  position:absolute;left:6px;top:6px;width:60px;height:60px;border-radius:50%;
+  background:#ff6b35;color:#0b0d10;display:flex;align-items:center;justify-content:center;
+  cursor:grab;will-change:transform;
+}
+.slide.back .knob{transition:transform .25s}
+.slide .knob svg{width:40%;height:40%}
+
+/* 停止の確認 */
+#confirm{
+  position:fixed;inset:0;z-index:10;background:rgba(11,13,16,.88);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:34px;
+}
+#confirm.on{display:flex}
+#confirm .q{font-size:35px;font-weight:300;letter-spacing:.04em}
+#confirm .btns{display:flex;gap:18px}
+#confirm button{
+  min-width:136px;height:66px;border-radius:999px;border:1.5px solid #3a4250;background:transparent;
+  color:#fff;font-size:22px;font-family:inherit;cursor:pointer;touch-action:manipulation;
+}
+#confirm button.stop{background:#ff6b35;border-color:#ff6b35;color:#0b0d10;font-weight:600}
+#confirm button:active{opacity:.8}
 
 #toast{
   position:fixed;left:50%;transform:translateX(-50%);
@@ -75,9 +103,23 @@ body{
   </div>
 
   <button class="big" id="play" aria-label="開始">
-    <svg class="ring" viewBox="0 0 100 100"><circle id="prog" cx="50" cy="50" r="48"/></svg>
     <svg id="ico" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.54.84l10-6.5a1 1 0 0 0 0-1.68l-10-6.5A1 1 0 0 0 8 5.5z"/></svg>
   </button>
+
+  <div class="slide" id="slide">
+    <div class="hint">スライドで停止</div>
+    <div class="knob" id="knob" aria-label="右へスライドで停止">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.3 5.3a1 1 0 0 1 1.4 0l6 6a1 1 0 0 1 0 1.4l-6 6a1 1 0 0 1-1.4-1.4L14.6 12 9.3 6.7a1 1 0 0 1 0-1.4z"/></svg>
+    </div>
+  </div>
+</div>
+
+<div id="confirm">
+  <div class="q">停止しますか？</div>
+  <div class="btns">
+    <button id="cont">続ける</button>
+    <button id="doStop" class="stop">停止</button>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -165,15 +207,11 @@ function toast(msg, ms){
 }
 
 /* ==================== 進行 ==================== */
-const PLAY = 'M8 5.5v13a1 1 0 0 0 1.54.84l10-6.5a1 1 0 0 0 0-1.68l-10-6.5A1 1 0 0 0 8 5.5z';
-const STOP = 'M6.5 8a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-8a1.5 1.5 0 0 1-1.5-1.5z';
-
 let running = false, t0 = 0, idx = 0, loop = null, lastLap = 0, curLevel = 1;
 
 function paint(){
-  $('ico').firstElementChild.setAttribute('d', running ? STOP : PLAY);
-  $('play').classList.toggle('playing', running);
-  $('play').setAttribute('aria-label', running ? '長押しで停止' : '開始');
+  $('play').classList.toggle('hide', running);
+  $('slide').classList.toggle('on', running);
 }
 
 function show(lap, level, dist){
@@ -206,52 +244,63 @@ function begin(){
 function halt(){
   if(loop){ clearInterval(loop); loop = null; }
   running = false;
+  closeConfirm();
   paint(); release();
 }
-function stop(){    // 長押しによる中止。本数・距離は画面に残したままにする
+function stop(){    // スライドと確認による中止。本数・距離は画面に残したままにする
   halt();
 }
 function finish(){ // 全本数を走りきった
   halt();
 }
 
-/* ==================== 停止は2秒長押し ==================== */
-const HOLD = 2000;
-const btn = $('play'), prog = $('prog');
-const C = 2 * Math.PI * 48;
-prog.style.strokeDasharray = C;
-prog.style.strokeDashoffset = C;
+/* ==================== 停止はスライド → 確認 ==================== */
+const slide = $('slide'), knob = $('knob');
+let drag = null;                                   // {id, x0, max, x}
 
-let raf = null, timer = null, hold0 = 0, skipClick = false;
+function setKnob(x){ knob.style.transform = 'translateX(' + x + 'px)'; }
 
-function holdStart(){
-  if(!running || timer) return;
-  hold0 = performance.now();
-  btn.classList.add('holding');
-  timer = setTimeout(() => { timer = null; skipClick = true; stop(); }, HOLD);
-  const draw = () => {
-    const p = Math.min(1, (performance.now() - hold0) / HOLD);
-    prog.style.strokeDashoffset = C * (1 - p);
-    raf = p < 1 ? requestAnimationFrame(draw) : null;
-  };
-  raf = requestAnimationFrame(draw);
+knob.addEventListener('pointerdown', e => {
+  if(!running || drag) return;
+  drag = {id: e.pointerId, x0: e.clientX, max: slide.clientWidth - knob.offsetWidth - 12, x: 0};
+  slide.classList.remove('back');
+  knob.setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+knob.addEventListener('pointermove', e => {
+  if(!drag || e.pointerId !== drag.id) return;
+  drag.x = Math.min(drag.max, Math.max(0, e.clientX - drag.x0));
+  setKnob(drag.x);
+});
+function dragEnd(e){
+  if(!drag || e.pointerId !== drag.id) return;
+  const reached = drag.x >= drag.max * 0.9;         // 右端まで引き切ったか
+  drag = null;
+  slide.classList.add('back'); setKnob(0);
+  if(reached && running) askStop();
 }
-function holdEnd(){
-  const held = timer ? performance.now() - hold0 : 0;
-  if(timer){ clearTimeout(timer); timer = null; }
-  if(raf){ cancelAnimationFrame(raf); raf = null; }
-  btn.classList.remove('holding');
-  prog.style.strokeDashoffset = C;
-  if(held > 0 && held < 600 && running) toast('長押しで停止', 1400);
-}
+knob.addEventListener('pointerup', dragEnd);
+knob.addEventListener('pointercancel', dragEnd);
+slide.addEventListener('contextmenu', e => e.preventDefault());
 
-btn.addEventListener('pointerdown', holdStart);
-btn.addEventListener('pointerup', holdEnd);
-btn.addEventListener('pointercancel', holdEnd);
-btn.addEventListener('pointerleave', holdEnd);
+const CONFIRM_MS = 5000;                           // 放置したら自動で閉じて続行
+let confirmTimer = null;
+function askStop(){
+  $('confirm').classList.add('on');
+  clearTimeout(confirmTimer);
+  confirmTimer = setTimeout(closeConfirm, CONFIRM_MS);
+}
+function closeConfirm(){
+  clearTimeout(confirmTimer); confirmTimer = null;
+  $('confirm').classList.remove('on');
+}
+$('cont').addEventListener('click', closeConfirm);
+$('doStop').addEventListener('click', () => { closeConfirm(); stop(); });
+
+/* ==================== 開始 ==================== */
+const btn = $('play');
 btn.addEventListener('contextmenu', e => e.preventDefault());
 btn.addEventListener('click', async () => {
-  if(skipClick){ skipClick = false; return; }
   if(running) return;
   if(!ready){ toast('音声を準備しています…', 1500); return; }
   if(ctx.state === 'suspended') await ctx.resume();   // iOSはタップ内で起こす必要がある
