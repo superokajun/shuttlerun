@@ -31,11 +31,15 @@ body{
   font-variant-numeric:tabular-nums;font-feature-settings:"tnum";
 }
 .unit{font-size:36px;font-weight:300;color:#fff;margin-left:8px;letter-spacing:0}
-/* ラベルと数値の境目を画面のど真ん中に固定する */
-.row{display:grid;grid-template-columns:1fr 1fr;column-gap:14px;margin-top:10px;color:#fff;font-variant-numeric:tabular-nums}
-.row:first-of-type{margin-top:18px}
-.lbl{font-size:35px;font-weight:300;letter-spacing:.02em;text-align:center}
-.val{font-size:35px;font-weight:300;letter-spacing:-.01em;text-align:center}
+/* 2列×3行の表。列幅は各列で一番長い文字に合わせ、表ごと中央に置く */
+.rows{
+  display:grid;grid-template-columns:max-content max-content;
+  column-gap:.3em;row-gap:10px;justify-content:center;margin-top:18px;
+  color:#fff;font-size:35px;font-weight:300;font-variant-numeric:tabular-nums;
+}
+.row{display:contents}
+.lbl{letter-spacing:.02em;text-align:center}
+.val{letter-spacing:-.01em;text-align:center}
 
 .big{
   position:relative;margin:auto 0;
@@ -68,9 +72,11 @@ body{
   <div class="title">80mシャトルラン</div>
   <div class="head">
     <div class="laps"><span id="laps">0</span><span class="unit">本</span></div>
-    <div class="row"><span class="lbl">レベル</span><span class="val" id="level">1</span></div>
-    <div class="row"><span class="lbl">時速</span><span class="val" id="speed">8.0km</span></div>
-    <div class="row"><span class="lbl">距離</span><span class="val" id="dist">0m</span></div>
+    <div class="rows">
+      <div class="row"><span class="lbl">レベル</span><span class="val" id="level">1</span></div>
+      <div class="row"><span class="lbl">時速</span><span class="val" id="speed">8.0km</span></div>
+      <div class="row"><span class="lbl">距離</span><span class="val" id="dist">0m</span></div>
+    </div>
   </div>
 
   <button class="big" id="play" aria-label="開始">
