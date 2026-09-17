@@ -26,15 +26,10 @@ body{
 
 .title{font-size:35px;font-weight:600;color:#fff;letter-spacing:.06em;margin-bottom:26px}
 .head{text-align:center;width:100%}
-.laps{
-  font-size:104px;font-weight:250;line-height:1;letter-spacing:-.03em;
-  font-variant-numeric:tabular-nums;font-feature-settings:"tnum";
-}
-.unit{font-size:36px;font-weight:300;color:#fff;margin-left:8px;letter-spacing:0}
-/* 2列×3行の表。列幅は各列で一番長い文字に合わせ、表ごと中央に置く */
+/* 2列×4行の表。列幅は各列で一番長い文字に合わせ、表ごと中央に置く */
 .rows{
   display:grid;grid-template-columns:max-content max-content;
-  column-gap:.3em;row-gap:10px;justify-content:center;margin-top:18px;
+  column-gap:.3em;row-gap:10px;justify-content:center;
   color:#fff;font-size:35px;font-weight:300;font-variant-numeric:tabular-nums;
 }
 .row{display:contents}
@@ -71,11 +66,11 @@ body{
 <div id="app">
   <div class="title">80mシャトルラン</div>
   <div class="head">
-    <div class="laps"><span id="laps">0</span><span class="unit">本</span></div>
     <div class="rows">
       <div class="row"><span class="lbl">レベル</span><span class="val" id="level">1</span></div>
       <div class="row"><span class="lbl">時速</span><span class="val" id="speed">8.0km</span></div>
       <div class="row"><span class="lbl">距離</span><span class="val" id="dist">0m</span></div>
+      <div class="row"><span class="lbl">本数</span><span class="val" id="laps">0</span></div>
     </div>
   </div>
 
