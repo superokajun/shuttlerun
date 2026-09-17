@@ -31,9 +31,10 @@ body{
   font-variant-numeric:tabular-nums;font-feature-settings:"tnum";
 }
 .unit{font-size:36px;font-weight:300;color:#fff;margin-left:8px;letter-spacing:0}
-.meta{font-size:25px;color:#fff;margin-top:20px;letter-spacing:.02em;font-variant-numeric:tabular-nums}
-.dlabel{font-size:22px;color:#fff;margin-right:11px;letter-spacing:.04em}
-.dist{font-size:40px;color:#fff;font-weight:300;margin-top:12px;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.row{margin-top:10px;color:#fff;font-variant-numeric:tabular-nums}
+.row:first-of-type{margin-top:18px}
+.lbl{font-size:22px;margin-right:11px;letter-spacing:.04em}
+.val{font-size:40px;font-weight:300;letter-spacing:-.01em}
 
 .big{
   position:relative;margin:auto 0;
@@ -66,8 +67,9 @@ body{
   <div class="title">80mシャトルラン</div>
   <div class="head">
     <div class="laps"><span id="laps">0</span><span class="unit">本</span></div>
-    <div class="meta" id="meta">レベル1 · 8.0km/h</div>
-    <div class="dist"><span class="dlabel">走行距離</span><span id="dist">0m</span></div>
+    <div class="row"><span class="lbl">レベル</span><span class="val" id="level">1</span></div>
+    <div class="row"><span class="lbl">時速</span><span class="val" id="speed">8.0km/h</span></div>
+    <div class="row"><span class="lbl">距離</span><span class="val" id="dist">0m</span></div>
   </div>
 
   <button class="big" id="play" aria-label="開始">
@@ -174,7 +176,8 @@ function paint(){
 
 function show(lap, level, dist){
   $('laps').textContent = lap;
-  $('meta').textContent = 'レベル' + level + ' · ' + speedOf(level).toFixed(1) + 'km/h';
+  $('level').textContent = level;
+  $('speed').textContent = speedOf(level).toFixed(1) + 'km/h';
   $('dist').textContent = dist + 'm';
 }
 
